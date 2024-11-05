@@ -56,7 +56,17 @@ namespace momdp{
 	    int oldNumUpdates, newNumUpdates;
 #endif
 	    //  std::vector<double> trialTargetPrecisionArr;  // double trialTargetPrecision;		// SYLMOD17102008 for parallel trials
-
+		struct NodeMetrics {
+			std::vector<double> valueHistory;
+			int visitCount;
+			double lastImprovement;
+		};
+		std::map<cacherow_stval, NodeMetrics, CacheRowCompare> nodeMetrics;
+		
+		// Add new helper methods
+		bool checkImprovement(const cacherow_stval& beliefIndex, double currentValue);
+		double calculateOptimalityLikelihood(const BeliefTreeNode& node);
+		bool shouldTerminateSampling(const BeliefTreeNode& node, const cacherow_stval& beliefIndex, unsigned int currentRoot);
 
 
 	    //BeliefCache* beliefCache;  // removed for factored, now accessed through Bounds class

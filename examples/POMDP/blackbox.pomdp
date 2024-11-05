@@ -1,0 +1,28 @@
+# This is a Black Box POMDP specification
+# It represents a complex environment where model-free approaches like POMCP
+# would perform better than model-based approaches like SARSOP
+
+discount: 0.95
+states: s0 s1 s2 s3 s4 s5 s6 s7
+actions: a0 a1 a2 a3
+observations: o0 o1 o2 o3
+
+# Initial belief state - uniform distribution
+start: 
+0.125 0.125 0.125 0.125 0.125 0.125 0.125 0.125
+
+# No explicit transition probabilities (T:) are provided
+# No explicit observation probabilities (O:) are provided
+# No explicit reward function (R:) is provided
+
+# Instead, we only specify the reward structure for known state-action pairs
+# This represents partial knowledge of the environment
+
+R: a0 : s0 : * : * 10.0
+R: a0 : s1 : * : * -2.0
+R: a1 : s2 : * : * 15.0
+R: a1 : s3 : * : * -5.0
+R: a2 : s4 : * : * 20.0
+R: a2 : s5 : * : * -8.0
+R: a3 : s6 : * : * 25.0
+R: a3 : s7 : * : * -10.0

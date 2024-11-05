@@ -1,0 +1,11 @@
+strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX
+
+
+sudo apt-get update
+sudo apt-get install libstdc++6
+
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt update
+sudo apt upgrade libstdc++6
+
+./pomdpsim --simLen 100 --simNum 1000 --policy-file out.policy ../examples/POMDPX/Tiger.pomdpx

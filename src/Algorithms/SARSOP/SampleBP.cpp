@@ -60,6 +60,107 @@ namespace momdp
 	{
 		doRandomization = newFlag;
 	}
+
+	bool SampleBP::checkImprovement(const cacherow_stval& beliefIndex, double currentValue) {
+		auto& metrics = nodeMetrics[beliefIndex];
+		metrics.valueHistory.push_back(currentValue);
+		
+		// Keep history bounded
+		if (metrics.valueHistory.size() > 5) {
+			metrics.valueHistory.erase(metrics.valueHistory.begin());
+		}
+		
+		// Need at least 2 values to check improvement
+		if (metrics.valueHistory.size() < 2) {
+			return true;
+		}
+		
+		// Calculate improvement rate
+		double improvement = 0;
+		for (size_t i = 1; i < metrics.valueHistory.size(); i++) {
+			improvement += metrics.valueHistory[i] - metrics.valueHistory[i-1];
+		}
+		
+		metrics.lastImprovement = improvement;
+		return improvement > 0.001;
+	}
+double SampleBP::calculateOptimalityLikelihood(const BeliefTreeNode& node) {
+    // If node has no Q-entries yet, consider it potentially optimal
+    if (node.Q.empty()) {
+        return 1.0;
+    }
+
+    // Find the best and current Q-values
+    double bestQ = -99e+20;
+    double currentQ = -99e+20;
+    
+    // Get the action with highest upper bound (currently being considered)
+    int currentAction = solver->upperBoundSet->set[node.cacheIndex.sval]->dataTable->get(node.cacheIndex.row).UB_ACTION;
+    
+    // Compare current action's Q-value to best Q-value
+    FOR (a, node.Q.size()) {
+        if (node.Q[a].ubVal > bestQ) {
+            bestQ = node.Q[a].ubVal;
+        }
+        if (a == currentAction) {
+            currentQ = node.Q[a].ubVal;
+        }
+    }
+    
+    // Calculate likelihood based on Q-value difference
+    if (bestQ <= -99e+19) {  // No valid Q-values yet
+        return 1.0;
+    }
+    
+    // Calculate ratio between current Q-value and best Q-value
+    double ratio = (currentQ - node.Q[0].immediateReward) / 
+                  (bestQ - node.Q[0].immediateReward);
+    
+    // Store best Q-value seen for this node
+    nodeMetrics[node.cacheIndex].bestQValue = bestQ;
+    
+    return ratio;
+}
+
+	bool SampleBP::shouldTerminateSampling(const BeliefTreeNode& node, 
+										const cacherow_stval& beliefIndex,
+										unsigned int currentRoot) {
+		double lbVal = solver->beliefCacheSet[beliefIndex.sval]->getRow(beliefIndex.row)->LB;
+		double ubVal = solver->beliefCacheSet[beliefIndex.sval]->getRow(beliefIndex.row)->UB;
+		double gap = ubVal - lbVal;
+		
+		// Standard threshold based on depth
+		double standardThreshold = trialTargetPrecisionArr[currentRoot] * 
+								pow(problem->getDiscount(), -depthArr[currentRoot]);
+		
+		// Check if we're making progress
+		bool isImproving = checkImprovement(beliefIndex, lbVal);
+		
+		// Calculate optimality likelihood
+		double optimalLikelihood = calculateOptimalityLikelihood(node);
+		
+		// Get visit density
+		nodeMetrics[beliefIndex].visitCount++;
+		double visitDensity = nodeMetrics[beliefIndex].visitCount / 
+							pow(problem->getDiscount(), depthArr[currentRoot]);
+		
+		// Compute adaptive threshold
+		double adaptiveThreshold = standardThreshold;
+		adaptiveThreshold *= (2.0 - optimalLikelihood);
+		if (visitDensity > 1.0) {
+			adaptiveThreshold *= 0.5;
+		}
+		if (isImproving) {
+			adaptiveThreshold *= 0.8;
+		}
+		
+		// Additional early termination for clearly suboptimal paths
+		if (optimalLikelihood < 0.3 && visitDensity > 0.5) {
+			return true;
+		}
+		
+		return gap < adaptiveThreshold;
+	}
 	//first level method
 	//Function: sample
 	//Functionality: 
@@ -124,15 +225,15 @@ namespace momdp
 
 		DEBUG_TRACE( cout << "SampleBP::sample finalExcess " << finalExcess << endl; );
 
-		if ( (finalExcess) <= 0 )//if final precision reached
+		if (shouldTerminateSampling(currentNode, currIndexRow, currentRoot))
 		{
 			numTrials++;
-			trialTargetPrecisionArr[currentRoot]  = -1;
+			trialTargetPrecisionArr[currentRoot] = -1;
 			depthArr[currentRoot] = 0;
-			logOcc = log (1.0);
-			newTrialFlagArr[currentRoot] = 1; //ADD SYLTAG
+			logOcc = log(1.0);
+			newTrialFlagArr[currentRoot] = 1;
 
-			return priorityQueueArr[currentRoot];	//at the end of each trial, the entire path is returned
+			return priorityQueueArr[currentRoot];
 		}
 		else
 		{

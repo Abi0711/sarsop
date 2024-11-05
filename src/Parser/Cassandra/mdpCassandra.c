@@ -68,9 +68,6 @@ representation, then we allocate the rest of the memory.
 
 /* Intermediate variables */
 
-I_Matrix *IP;  /* Transition Probabilities */
-
-I_Matrix *IR;  /* Observation Probabilities (POMDP only) */
 
 I_Matrix IQ;  /* Immediate action-state pair values (both MDP and POMDP) */
 
